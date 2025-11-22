@@ -1,12 +1,11 @@
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 import joblib
 import numpy as np
 
+app = FastAPI(title="Dự đoán Bỏ Học API")
 
-app = FastAPI(title="Dự đoán Bỏ Học API", version="1.0")
-
-# Load model
 model = joblib.load("dropout_model.pkl")
 
 class StudentInput(BaseModel):
@@ -21,10 +20,6 @@ class StudentInput(BaseModel):
     AgeAtEnrollment: int
     Gender: int
     Course: int
-
-@app.get("/")
-def root():
-    return {"message": "API dự đoán bỏ học sẵn sàng! Gọi /predict để dùng."}
 
 @app.post("/predict")
 def predict(student: StudentInput):
