@@ -51,12 +51,8 @@ def predict(input_data: PredictionInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error during prediction: {str(e)}")
 
-# Endpoint test (GET)
-@app.get("/")
-def root():
-    return {"message": "API is running. Use /predict for predictions."}
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
