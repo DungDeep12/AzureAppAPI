@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import joblib
 import pandas as pd
@@ -8,6 +10,12 @@ import numpy as np
 model = joblib.load("dropout_model.pkl")  # Thay path nếu cần
 
 app = FastAPI(title="Student Dropout Prediction API")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def get_home():
+    return FileResponse("static/index.html")
 
 # Định nghĩa schema input dựa trên features từ dataset của bạn
 class PredictionInput(BaseModel):
@@ -51,3 +59,4 @@ def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
