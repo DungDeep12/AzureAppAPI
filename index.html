@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dự đoán Nguy cơ Bỏ học Sinh viên</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.2em; opacity: 0.9; }
+
+        .form-container { padding: 40px; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 28px;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.98em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .info-icon {
+            width: 16px; height: 16px; background: #667eea; color: white; border-radius: 50%;
+            font-size: 12px; display: inline-flex; align-items: center; justify-content: center;
+            cursor: help;
+        }
+        .tooltip {
+            visibility: hidden; position: absolute; top: 100%; left: 0;
+            background: #333; color: white; padding: 10px 12px; border-radius: 8px;
+            font-size: 0.85em; width: 320px; z-index: 10; opacity: 0;
+            transition: all 0.3s; box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            line-height: 1.4;
+        }
+        .form-group:hover .tooltip {
+            visibility: visible; opacity: 1; top: 110%;
+        }
+
+        .form-group input, .form-group select {
+            padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px;
+            font-size: 1em; transition: all 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .btn-predict {
+            width: 100%; padding: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 12px; font-size: 1.35em; font-weight: 700;
+            cursor: pointer; transition: all 0.3s; letter-spacing: 1px;
+        }
+        .btn-predict:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(102,126,234,0.5); }
+
+        /* Kết quả */
+        .result-container {
+            margin-top: 40px; padding: 35px; border-radius: 16px; display: none;
+            animation: slideIn 0.7s ease; text-align: center;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+        .result-container.dropout { background: #ffebee; border: 4px solid #f44336; }
+        .result-container.not-dropout { background: #e8f5e9; border: 4px solid #4caf50; }
+        .result-title { font-size: 2em; font-weight: 800; margin-bottom: 15px; }
+        .result-probability { font-size: 1.5em; font-weight: 700; margin: 15px 0; }
+
+        .progress-bar {
+            width: 100%; height: 50px; background: #e0e0e0; border-radius: 25px;
+            overflow: hidden; margin-top: 20px; box-shadow: inset 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .progress-fill {
+            height: 100%; width: 0%; transition: width 1.6s cubic-bezier(0.65, 0, 0.35, 1);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 900; font-size: 1.5em; text-shadow: 0 3px 8px rgba(0,0,0,0.6);
+            border-radius: 25px; position: relative; min-width: 80px;
+            overflow: hidden;
+        }
+        .progress-fill.high { background: linear-gradient(90deg, #f44336 0%, #e91e63 100%); }
+        .progress-fill.low { background: linear-gradient(90deg, #4caf50 0%, #8bc34a 100%); }
+
+        .loading { display: none; text-align: center; padding: 40px; }
+        .spinner { border: 6px solid #f3f3f3; border-top: 6px solid #667eea; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-message { background: #ffebee; border: 2px solid #f44336; color: #c62828; padding: 20px; border-radius: 12px; margin-top: 20px; display: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> Dự đoán Nguy cơ Bỏ học Sinh viên</h1>
+            <p>Hệ thống sử dụng Machine Learning để phát hiện sớm sinh viên có nguy cơ bỏ học</p>
+        </div>
+
+        <div class="form-container">
+            <form id="predictionForm">
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Học phí đã đóng đầy đủ? <span class="info-icon">i</span></label>
+                        <select id="tuitionFees" required>
+                            <option value="">Chọn...</option>
+                            <option value="1">Có</option>
+                            <option value="0">Không (còn nợ)</option>
+                        </select>
+                        <div class="tooltip">Yếu tố QUAN TRỌNG NHẤT! Sinh viên nợ học phí có nguy cơ bỏ học cao gấp 5–10 lần.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Có học bổng? <span class="info-icon">i</span></label>
+                        <select id="scholarship" required>
+                            <option value="">Chọn...</option>
+                            <option value="1">Có</option>
+                            <option value="0">Không</option>
+                        </select>
+                        <div class="tooltip">Học bổng là yếu tố bảo vệ mạnh, giảm nguy cơ bỏ học đến 70%.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Điểm TB học kỳ 1 (0–20) <span class="info-icon">i</span></label>
+                        <input type="number" id="grade1" step="0.1" min="0" max="20" placeholder="VD: 14.5" required>
+                        <div class="tooltip">Thang điểm Bồ Đào Nha: ≥10 = đậu, ≥14 = khá/giỏi, ≥16 = xuất sắc.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Số môn đã đậu HK1</label>
+                        <input type="number" id="approved1" min="0" max="26" placeholder="VD: 6" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Điểm TB học kỳ 2 (0–20) <span class="info-icon">i</span></label>
+                        <input type="number" id="grade2" step="0.1" min="0" max="20" placeholder="VD: 15.0" required>
+                        <div class="tooltip">QUAN TRỌNG NHẤT! Điểm giảm mạnh hoặc thấp ở HK2 → nguy cơ bỏ học tăng vọt.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Số môn đã đậu HK2 <span class="info-icon">i</span></label>
+                        <input type="number" id="approved2" min="0" max="26" placeholder="VD: 7" required>
+                        <div class="tooltip">Nếu chỉ đậu 0–1 môn HK2 → 97% sinh viên bỏ học!</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Trình độ trước khi vào ĐH</label>
+                        <input type="number" id="prevQual" min="1" max="43" value="1" placeholder="Phổ biến: 1" required>
+						<div class="tooltip">
+        					1 = THPT phổ thông (phổ biến nhất)<br>
+        					3 = THPT nghề<br>
+        					4 = THPT giáo dục người lớn<br>
+        					6 = Trình độ khác<br>
+    					</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tình trạng hôn nhân <span class="info-icon">i</span></label>
+                        <select id="marital" required>
+                            <option value="1">Độc thân (phổ biến)</option>
+                            <option value="2">Đã kết hôn</option>
+                            <option value="3">Góa</option>
+                            <option value="4">Ly hôn</option>
+                            <option value="5">Ly thân</option>
+                            <option value="6">Khác</option>
+                        </select>
+                        <div class="tooltip">Sinh viên đã kết hôn hoặc có con → nguy cơ bỏ học cao hơn đáng kể.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tuổi khi nhập học <span class="info-icon">i</span></label>
+                        <input type="number" id="age" min="17" max="70" placeholder="VD: 19" required>
+                        <div class="tooltip">Tuổi > 25 → nguy cơ tăng mạnh, > 30 → rất cao.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Giới tính</label>
+                        <select id="gender" required>
+                            <option value="1">Nam</option>
+                            <option value="0">Nữ</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ngành học <span class="info-icon">i</span></label>
+                        <select id="course" required>
+                            <option value="">-- Chọn ngành học --</option>
+                            <option value="33">33 - Công nghệ sản xuất Nhiên liệu sinh học</option>
+                            <option value="171">171 - Thiết kế Hoạt hình & Đa phương tiện</option>
+                            <option value="8014">8014 - Công tác xã hội (học buổi tối)</option>
+                            <option value="9003">9003 - Nông học</option>
+                            <option value="9070">9070 - Thiết kế Truyền thông</option>
+                            <option value="9085">9085 - Điều dưỡng Thú y</option>
+                            <option value="9119">9119 - Kỹ thuật Tin học </option>
+                            <option value="9130">9130 - Nghề nuôi Ngựa</option>
+                            <option value="9147">9147 - Quản trị </option>
+                            <option value="9238">9238 - Công tác Xã hội</option>
+                            <option value="9254">9254 - Du lịch</option>
+                            <option value="9500">9500 - Điều dưỡng </option>
+                            <option value="9556">9556 - Vệ sinh Răng miệng</option>
+                            <option value="9670">9670 - Quản trị Quảng cáo & Marketing</option>
+                            <option value="9773">9773 - Báo chí và Truyền thông</option>
+                            <option value="9853">9853 - Sư phạm Giáo dục cơ bản</option>
+                            <option value="9991">9991 - Quản trị (học buổi tối)</option>
+                        </select>
+                        <div class="tooltip">Một số ngành có tỷ lệ bỏ học cao: 9500 (Nursing), 9119 (Tin học), 9003 (Nông học).</div>
+                    </div>
+
+                </div>
+
+                <button type="submit" class="btn-predict">DỰ ĐOÁN NGAY</button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Đang phân tích dữ liệu...</p>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="result-container" id="resultContainer">
+                <div class="result-title" id="resultTitle"></div>
+                <div class="result-probability" id="resultProbability"></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('predictionForm');
+        const loading = document.getElementById('loading');
+        const resultContainer = document.getElementById('resultContainer');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultProbability = document.getElementById('resultProbability');
+        const progressFill = document.getElementById('progressFill');
+
+        const API_URL = 'https://studentdropoutprediction-e2hjegf4d2eudgbh.japaneast-01.azurewebsites.net/predict';
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            resultContainer.style.display = 'none';
+            errorMessage.style.display = 'none';
+            loading.style.display = 'block';
+
+            const formData = {
+                TuitionFeesUpToDate: parseInt(document.getElementById('tuitionFees').value),
+                ScholarshipHolder: parseInt(document.getElementById('scholarship').value),
+                CurricularUnits1stSemGrade: parseFloat(document.getElementById('grade1').value),
+                CurricularUnits1stSemApproved: parseInt(document.getElementById('approved1').value),
+                CurricularUnits2ndSemGrade: parseFloat(document.getElementById('grade2').value),
+                CurricularUnits2ndSemApproved: parseInt(document.getElementById('approved2').value),
+                PreviousQualification: parseInt(document.getElementById('prevQual').value),
+                MaritalStatus: parseInt(document.getElementById('marital').value),
+                AgeAtEnrollment: parseInt(document.getElementById('age').value),
+                Gender: parseInt(document.getElementById('gender').value),
+                Course: parseInt(document.getElementById('course').value)
+            };
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) throw new Error('API lỗi');
+
+                const data = await response.json();
+
+                // ĐẢO NGƯỢC LOGIC DO MÔ HÌNH BỊ ĐẢO NHÃN
+                const isDropout = data.prediction === 'Not Dropout';
+                const trueDropoutProb = (1 - data.probability) * 100;
+                const prob = trueDropoutProb.toFixed(2);
+
+                resultContainer.className = 'result-container ' + (isDropout ? 'dropout' : 'not-dropout');
+                resultTitle.textContent = isDropout ? 'CÓ NGUY CƠ BỎ HỌC' : 'KHÔNG CÓ NGUY CƠ BỎ HỌC';
+                resultProbability.textContent = `Xác suất bỏ học: ${prob}%`;
+
+                progressFill.className = 'progress-fill ' + (trueDropoutProb > 50 ? 'high' : 'low');
+                progressFill.style.width = prob + '%';
+                progressFill.innerHTML = `<span>${prob}%</span>`;
+
+                resultContainer.style.display = 'block';
+            } catch (err) {
+                errorMessage.textContent = 'Không kết nối được API. Vui lòng thử lại sau vài phút (Azure đang khởi động).';
+                errorMessage.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
